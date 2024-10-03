@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: nfqueue-pol
+  name: nfqueue-pol
+spec:
+  selector:
+    matchLabels:
+      app: nfqueue-pol
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: nfqueue-pol
+    spec:
+      hostNetwork: true
+      serviceAccountName: nfqueue-pol
+      containers:
+      - image: docker.io/therealmitchconnors/nfqueue-pol:latest
+        name: nfqueue-pol
+        securityContext:
+          allowPrivilegeEscalation: true
+          privileged: true
+          runAsUser: 0
+        env:
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: POD_SERVICE_ACCOUNT
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.serviceAccountName
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nfqueue-pol
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: netpol-reader
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  - networkpolicies
+  - pods
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: netpol-nfqueue
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: netpol-reader
+subjects:
+- kind: ServiceAccount
+  name: nfqueue-pol
+  namespace: kube-system
